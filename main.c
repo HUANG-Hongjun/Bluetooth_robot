@@ -25,6 +25,11 @@ void initInfrarouge(void);
 void initMoteur(void);
 void initSuiveurLigne(void);
 void initLum(void);
+void USCI_A0_init(void);
+void TP1_2();
+void UARTSendString(char *pbuff);
+
+
 
 int main(void)
 {
@@ -32,14 +37,34 @@ int main(void)
 	ADC_init();
 	
 	initMoteur();
-	initSuiveurLigne();
-	initInfrarouge();
-	initLum();
+	//initSuiveurLigne();
+	//initInfrarouge();
+	//initLum();
 	initBoutonStart();
+	USCI_A0_init();
 
 	__delay_cycles(100000);
 	__enable_interrupt();
 	while(1);
+}
+
+//====================================interrupt============================================
+//TX interrupt
+#pragma vector=USCIAB0TX_VECTOR
+__interrupt void USCI0TX_ISR(void)
+{
+    //while(!(IFG2 & UCA0TXIFG));
+    IFG2&=~UCA0TXIFG;
+}
+
+//RX interrupt
+#pragma vector=USCIAB0RX_VECTOR
+__interrupt void USCI0RX_ISR(void)
+{
+   //while (!(IFG2&UCA0TXIFG));
+   IFG2&=~UCA0RXIFG;                // USCI_A0 TX buffer ready?
+   //UCA0TXBUF = UCA0RXBUF;
+   TP1_2();
 }
 
 #pragma vector = PORT1_VECTOR
@@ -48,10 +73,12 @@ __interrupt void tourner(void){
     {
         TA1CCR1 = 1000;             //positif 0-1000
         TA1CCR2 = 1000;             //positif 500-1000
-        while (((P1IN & capSLG) == 0) | ((P1IN & capSLD) == 0));
+        //while (((P1IN & capSLG) == 0) | ((P1IN & capSLD) == 0));
+        __delay_cycles(100000);
         start = 1;
         P1IFG &= ~(boutonStart);
     }
+    /*
     else if (((P1IFG & capSLG) == capSLG) && (start == 1))
     {
         TA1CCR1 = 0;
@@ -122,8 +149,9 @@ __interrupt void tourner(void){
         }
 
     }
+    */
 }
-
+/*
 #pragma vector = TIMER0_A1_VECTOR
 __interrupt void stopOrTurn(void) {
     //stop
@@ -175,6 +203,7 @@ __interrupt void stopOrTurn(void) {
     TA0CTL &= ~TAIFG;
 }
 
+*/
 
 
 
@@ -242,4 +271,66 @@ void initLum(void)
     P1SEL &= ~(capLUMG | capLUMD);           //mode selectionner E/S
     P1SEL2 &= ~(capLUMG | capLUMD);
     P1DIR &= ~(capLUMG | capLUMD);           //Input
+}
+
+void USCI_A0_init(void){
+      //CLOCK
+      DCOCTL = 0;
+      BCSCTL1 = CALBC1_1MHZ;
+      DCOCTL = CALDCO_1MHZ;
+      //GPIO
+      P1SEL = BIT1 + BIT2 ;                     // P1.1 = RXD, P1.2=TXD
+      P1SEL2 = BIT1 + BIT2 ;                    // P1.1 = RXD, P1.2=TXD
+
+      UCA0CTL1 |= UCSSEL_2;                     // SMCLK
+      UCA0BR0 = 104;                            // 1MHz 9600
+      UCA0BR1 = 0;                              // 1MHz 9600
+      UCA0MCTL =UCBRS_0;                        // Modulation UCBRSx = 1
+      UCA0CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
+
+      IE2 |= UCA0RXIE+UCA0TXIE;                 //enable interrupt
+      _enable_interrupts();
+      _bis_SR_register(LPM0_bits);
+ }
+
+
+void TP1_2(){
+    char com;
+    com=UCA0RXBUF;
+    switch(com){
+    case 'h':
+        UARTSendString("h----help\n\r");
+        UARTSendString("w----run\n\r");
+        UARTSendString("s----stop\n\r");
+        //UARTSendString("s----change state of LED\n\r");
+        break;
+    case 'w':
+        UARTSendString("run\n\r");
+        TA1CCR1 = 1000;             //positif 0-1000
+        TA1CCR2 = 1000;             //positif 500-1000
+        break;
+    case 'e':
+        UARTSendString("turn off LED\n\r");
+        P1OUT &= ~BIT0;
+        break;
+    case 's':
+        UARTSendString("stop\n\r");
+        TA1CCR1 = 0;             //positif 0-1000
+        TA1CCR2 = 500;             //positif 500-1000
+        break;
+    default:
+        UARTSendString("Command does not exist, use 'h' for help\n\r");
+        break;
+    }
+    __delay_cycles(1000);
+}
+
+void UARTSendString(char *pbuff)
+{
+    while(*pbuff != '\0'){
+        while(UCA0STAT & UCBUSY);
+        UCA0TXBUF = *pbuff;
+        pbuff++;
+        __delay_cycles(10000);
+    }
 }
