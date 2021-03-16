@@ -26,7 +26,7 @@ void initMoteur(void);
 void initSuiveurLigne(void);
 void initLum(void);
 void USCI_A0_init(void);
-void TP1_2();
+void direction_control();
 void UARTSendString(char *pbuff);
 
 
@@ -34,13 +34,18 @@ void UARTSendString(char *pbuff);
 int main(void)
 {
 	WDTCTL = WDTPW | WDTHOLD;	             // stop watchdog timer
+    //CLOCK
+    DCOCTL = 0;
+    BCSCTL1 = CALBC1_1MHZ;
+    DCOCTL = CALDCO_1MHZ;
+
 	ADC_init();
 	
 	initMoteur();
 	//initSuiveurLigne();
-	//initInfrarouge();
+	initInfrarouge();
 	//initLum();
-	initBoutonStart();
+	//initBoutonStart();
 	USCI_A0_init();
 
 	__delay_cycles(100000);
@@ -64,7 +69,7 @@ __interrupt void USCI0RX_ISR(void)
    //while (!(IFG2&UCA0TXIFG));
    IFG2&=~UCA0RXIFG;                // USCI_A0 TX buffer ready?
    //UCA0TXBUF = UCA0RXBUF;
-   TP1_2();
+   direction_control();
 }
 
 #pragma vector = PORT1_VECTOR
@@ -151,7 +156,7 @@ __interrupt void tourner(void){
     }
     */
 }
-/*
+
 #pragma vector = TIMER0_A1_VECTOR
 __interrupt void stopOrTurn(void) {
     //stop
@@ -171,6 +176,7 @@ __interrupt void stopOrTurn(void) {
     TA1CCR1 = v1;
     TA1CCR2 = v2;
 
+    /*
     //turn
     ADC_Demarrer_conversion(1);
     lumG = ADC_Lire_resultat();
@@ -200,10 +206,10 @@ __interrupt void stopOrTurn(void) {
         TA1CCR1 = vmaxG;
         TA1CCR2 = vmaxD;
     }
+    */
     TA0CTL &= ~TAIFG;
 }
 
-*/
 
 
 
@@ -226,8 +232,6 @@ void initBoutonStart(void)
 //initialisation d'infrarouge
 void initInfrarouge(void)
 {
-    BCSCTL1 = CALBC1_1MHZ;
-    DCOCTL = CALDCO_1MHZ;                               //SMCLK 1MHz
     TA0CTL = 0 | (TASSEL_2 | ID_3 | MC_1 | TAIE);       //source SMCLK, prediviseur 8, mode up, enable interrupteur
     TA0CCR0 = 12500;                                    //100ms
     TA0CTL &= ~TAIFG;                                   //flag=0
@@ -274,10 +278,7 @@ void initLum(void)
 }
 
 void USCI_A0_init(void){
-      //CLOCK
-      DCOCTL = 0;
-      BCSCTL1 = CALBC1_1MHZ;
-      DCOCTL = CALDCO_1MHZ;
+
       //GPIO
       P1SEL = BIT1 + BIT2 ;                     // P1.1 = RXD, P1.2=TXD
       P1SEL2 = BIT1 + BIT2 ;                    // P1.1 = RXD, P1.2=TXD
@@ -294,7 +295,7 @@ void USCI_A0_init(void){
  }
 
 
-void TP1_2(){
+void direction_control(){
     char com;
     com=UCA0RXBUF;
     switch(com){
@@ -304,20 +305,34 @@ void TP1_2(){
         UARTSendString("s----stop\n\r");
         //UARTSendString("s----change state of LED\n\r");
         break;
-    case 'w':
+    case '8':
         UARTSendString("run\n\r");
         TA1CCR1 = 1000;             //positif 0-1000
         TA1CCR2 = 1000;             //positif 500-1000
         break;
-    case 'e':
-        UARTSendString("turn off LED\n\r");
-        P1OUT &= ~BIT0;
+    case '4':
+        UARTSendString("turn left\n\r");
+        TA1CCR1 = 0;             //positif 0-1000
+        TA1CCR2 = 750;             //positif 500-1000
         break;
-    case 's':
+    case '5':
         UARTSendString("stop\n\r");
+        P2OUT &= ~BIT1;
         TA1CCR1 = 0;             //positif 0-1000
         TA1CCR2 = 500;             //positif 500-1000
         break;
+    case '2':
+        UARTSendString("back\n\r");
+        P2OUT |= BIT1;
+        TA1CCR1 = 500;
+        TA1CCR2 = 250;
+        break;
+    case '6':
+        UARTSendString("turn right\n\r");
+        TA1CCR1 = 500;             //positif 0-1000
+        TA1CCR2 = 500;             //positif 500-1000
+        break;
+
     default:
         UARTSendString("Command does not exist, use 'h' for help\n\r");
         break;
