@@ -1,33 +1,27 @@
 #include <msp430.h>
 #include "ADC.h"
+#include <string.h>
 
 //Cablage des captures
-#define boutonStart BIT3                       //Bouton de commencer P1.3
 #define capIR BIT4                             //Capteur infrarouge P1.4
-#define capSLG BIT5                            //Capteur Suiveur Ligne Gauche P1.5
-#define capSLD BIT6                            //Capteur Suiveur Ligne Droite P1.6
-#define capLUMG BIT1                           //Capteur Lumiere Gauche P1.1
-#define capLUMD BIT0                           //Capteur Lumiere Droite P1.0
+
+//SPI master clock data in/out
+#define SCK         BIT5            // Serial Clock
+#define DATA_OUT    BIT6            // DATA out
+#define DATA_IN     BIT7            // DATA in
 
 //Les valeurs preconception
-#define vmaxG 900                              //vitesse de roue gauche (0-1000)
-#define vmaxD 950                              //vitesse de roue droite (500-1000)
-#define lumSeilG 950                            //Seuil du capteur lumiere gauche
-#define lumSeilD 700                            //Seuil du capteur lumiere droite
-
-//Les valeurs intermediaire
-int start=0;                                    //etat du robot 0:arrete; 1:commence
-int lumG, lumD;                                 //Les valeurs detecte par les capteurs lumieres
+#define vmaxG 1000                              //vitesse de roue gauche (0-1000)
+#define vmaxD 1000                              //vitesse de roue droite (500-1000)
 
 //Fonnction pour initialiser
-void initBoutonStart(void);
-void initInfrarouge(void);
-void initMoteur(void);
-void initSuiveurLigne(void);
-void initLum(void);
-void USCI_A0_init(void);
-void direction_control();
-void UARTSendString(char *pbuff);
+void init_Infrarouge(void);
+void init_Moteur(void);
+void init_UART(void);
+void direction_control(void);
+void UART_Send_String(char *pbuff);
+void init_SPI(void);
+void SPI_Send_char(unsigned char carac);
 
 
 
@@ -40,13 +34,15 @@ int main(void)
     DCOCTL = CALDCO_1MHZ;
 
 	ADC_init();
-	
-	initMoteur();
-	//initSuiveurLigne();
-	initInfrarouge();
-	//initLum();
-	//initBoutonStart();
-	USCI_A0_init();
+
+	init_Moteur();
+
+	init_Infrarouge();
+
+	init_UART();
+
+	init_SPI();
+
 
 	__delay_cycles(100000);
 	__enable_interrupt();
@@ -66,99 +62,26 @@ __interrupt void USCI0TX_ISR(void)
 #pragma vector=USCIAB0RX_VECTOR
 __interrupt void USCI0RX_ISR(void)
 {
-   //while (!(IFG2&UCA0TXIFG));
-   IFG2&=~UCA0RXIFG;                // USCI_A0 TX buffer ready?
-   //UCA0TXBUF = UCA0RXBUF;
-   direction_control();
+    //-------UART
+    if (IFG2 & UCA0RXIFG){
+        //while (!(IFG2&UCA0TXIFG));
+        IFG2&=~UCA0RXIFG;                // USCI_A0 TX buffer ready?
+        //UCA0TXBUF = UCA0RXBUF;
+        direction_control();
+    }
+
+    //--------------- SPI
+    else if (IFG2 & UCB0RXIFG)
+    {
+        while( (UCB0STAT & UCBUSY) && !(UCB0STAT & UCOE) );
+        while(!(IFG2 & UCB0RXIFG));
+    }
+
 }
 
-#pragma vector = PORT1_VECTOR
-__interrupt void tourner(void){
-    if (((P1IFG & boutonStart) == boutonStart) && (start == 0))
-    {
-        TA1CCR1 = 1000;             //positif 0-1000
-        TA1CCR2 = 1000;             //positif 500-1000
-        //while (((P1IN & capSLG) == 0) | ((P1IN & capSLD) == 0));
-        __delay_cycles(100000);
-        start = 1;
-        P1IFG &= ~(boutonStart);
-    }
-    /*
-    else if (((P1IFG & capSLG) == capSLG) && (start == 1))
-    {
-        TA1CCR1 = 0;
-        TA1CCR2 = 750;
-        while ((P1IN & capSLG) == 0)
-        {
-            if (TA1CCR2 < vmaxD)
-                TA1CCR2 = TA1CCR2+5;
-            __delay_cycles(10000);
-            if ((TA1CCR2 >= vmaxD-100) && ((P1IN & capSLD) == 0))
-            {
-                start = 0;
-            }
-        }
-        if (start == 0)
-        {
-            TA1CCR2 = 250;
-            while ((P1IN & capSLD) == 0);
-            TA1CCR1 = vmaxG-100;
-            TA1CCR2 = vmaxD;
-            __delay_cycles(200000);
-            while (((P1IN & capSLG) == 0) && ((P1IN & capSLD) == 0));
-            TA1CCR1 = 0;
-            TA1CCR2 = 500;
-            P1IFG &= ~(capSLG|capSLD);
-        }
-        else
-        {
-            TA1CCR1 = vmaxG;
-            TA1CCR2 = vmaxD;
-            P1IFG &= ~(capSLG|capSLD);
-        }
-
-    }
-    else if (((P1IFG & capSLD) == capSLD) && (start == 1))
-    {
-        TA1CCR1 = 500;
-        TA1CCR2 = 500;
-        while ((P1IN & capSLD) == 0)
-        {
-            if (TA1CCR1 < vmaxG)
-                TA1CCR1 = TA1CCR1+10;
-            __delay_cycles(10000);
-            if ((TA1CCR1 >= vmaxG-200) && ((P1IN & capSLG) == 0))
-            {
-                start = 0;
-            }
-        }
-        if (start == 0)
-        {
-            P2OUT |= BIT1;
-            TA1CCR1 = 500;
-            while ((P1IN & capSLG) == 0);
-            P2OUT &= ~BIT1;
-            TA1CCR1 = vmaxG;
-            TA1CCR2 = vmaxD-50;
-            __delay_cycles(200000);
-            while (((P1IN & capSLG) == 0) && ((P1IN & capSLD) == 0));
-            TA1CCR1 = 0;
-            TA1CCR2 = 500;
-            P1IFG &= ~(capSLG|capSLD);
-        }
-        else
-        {
-            TA1CCR1 = vmaxG;
-            TA1CCR2 = vmaxD;
-            P1IFG &= ~(capSLG|capSLD);
-        }
-
-    }
-    */
-}
 
 #pragma vector = TIMER0_A1_VECTOR
-__interrupt void stopOrTurn(void) {
+__interrupt void stop(void) {
     //stop
     P1DIR &= ~capIR;
     ADC_Demarrer_conversion(4);         //P1.4
@@ -176,61 +99,12 @@ __interrupt void stopOrTurn(void) {
     TA1CCR1 = v1;
     TA1CCR2 = v2;
 
-    /*
-    //turn
-    ADC_Demarrer_conversion(1);
-    lumG = ADC_Lire_resultat();
-    ADC_Demarrer_conversion(0);
-    lumD = ADC_Lire_resultat();
-    if ((lumG > lumSeilG) && (lumD < lumSeilD) && (start == 1))
-    {
-        TA1CCR1 = 0;
-        TA1CCR2 = 750;
-        while (lumG > lumSeilG -5)
-        {
-            ADC_Demarrer_conversion(1);
-            lumG = ADC_Lire_resultat();
-        }
-        TA1CCR1 = vmaxG;
-        TA1CCR2 = vmaxD;
-    }
-    else if ((lumD > lumSeilD) && (lumG < lumSeilG) && (start == 1))
-    {
-        TA1CCR1 = 500;
-        TA1CCR2 = 500;
-        while (lumD > lumSeilD -5)
-        {
-            ADC_Demarrer_conversion(0);
-            lumD = ADC_Lire_resultat();
-        }
-        TA1CCR1 = vmaxG;
-        TA1CCR2 = vmaxD;
-    }
-    */
     TA0CTL &= ~TAIFG;
 }
 
 
-
-
-
-
-
-//initialisation de bouton
-void initBoutonStart(void)
-{
-    P1SEL &= ~(boutonStart);                //mode selectionner E/S
-    P1SEL2 &= ~(boutonStart);
-    P1DIR &= ~(boutonStart);                //Input
-    P1REN |= boutonStart;                   //enable resistance interne
-    P1OUT |= boutonStart;                   //Pull-up
-    P1IE |= boutonStart;                    //enable interrupteur
-    P1IES |= boutonStart;                   //detect front montant
-    P1IFG &= ~(boutonStart);                //flag=0
-}
-
 //initialisation d'infrarouge
-void initInfrarouge(void)
+void init_Infrarouge(void)
 {
     TA0CTL = 0 | (TASSEL_2 | ID_3 | MC_1 | TAIE);       //source SMCLK, prediviseur 8, mode up, enable interrupteur
     TA0CCR0 = 12500;                                    //100ms
@@ -238,7 +112,7 @@ void initInfrarouge(void)
 }
 
 //initialisation de moteur
-void initMoteur(void)
+void init_Moteur(void)
 {
     P2SEL &= ~(BIT1|BIT4);                   //p2.1 p2.4 mode selectionner E/S    P2SEL2 &= ~(BIT1|BIT4);
 
@@ -258,26 +132,9 @@ void initMoteur(void)
     TA1CCR2 = 500;                           //roue droite arreter
 }
 
-//initialisation de suiveur-ligne
-void initSuiveurLigne(void)
-{
-    P1SEL &= ~(capSLG|capSLD);             //mode selectionner E/S
-    P1SEL2 &= ~(capSLG|capSLD);
-    P1DIR &= ~(capSLG|capSLD);             //Input
-    P1IE |= capSLG|capSLD;                 //enable interrupteur
-    P1IES |= capSLG|capSLD;                //detect front montant
-    P1IFG &= ~(capSLG|capSLD);             //flag=0
-}
 
-//initialisation de capteur lumiere
-void initLum(void)
-{
-    P1SEL &= ~(capLUMG | capLUMD);           //mode selectionner E/S
-    P1SEL2 &= ~(capLUMG | capLUMD);
-    P1DIR &= ~(capLUMG | capLUMD);           //Input
-}
 
-void USCI_A0_init(void){
+void init_UART(void){
 
       //GPIO
       P1SEL = BIT1 + BIT2 ;                     // P1.1 = RXD, P1.2=TXD
@@ -294,53 +151,98 @@ void USCI_A0_init(void){
       _bis_SR_register(LPM0_bits);
  }
 
+void init_SPI( void )
+{
+    // Waste Time, waiting Slave SYNC
+    __delay_cycles(250);
+
+    // SOFTWARE RESET - mode configuration
+    UCB0CTL0 = 0;
+    UCB0CTL1 = (0 + UCSWRST*1 );
+
+    // clearing IFg /16.4.9/p447/SLAU144j
+    // set by setting UCSWRST just before
+    IFG2 &= ~(UCB0TXIFG | UCB0RXIFG);
+
+    // Configuration SPI (voir slau144 p.445)
+    // UCCKPH = 0 -> Data changed on leading clock edges and sampled on trailing edges.
+    // UCCKPL = 0 -> Clock inactive state is low.
+    //   SPI Mode 0 :  UCCKPH * 1 | UCCKPL * 0
+    //   SPI Mode 1 :  UCCKPH * 0 | UCCKPL * 0  <--
+    //   SPI Mode 2 :  UCCKPH * 1 | UCCKPL * 1
+    //   SPI Mode 3 :  UCCKPH * 0 | UCCKPL * 1
+    // UCMSB  = 1 -> MSB premier
+    // UC7BIT = 0 -> 8 bits, 1 -> 7 bits
+    // UCMST  = 0 -> CLK by Master, 1 -> CLK by USCI bit CLK / p441/16.3.6
+    // UCMODE_x  x=0 -> 3-pin SPI,
+    //           x=1 -> 4-pin SPI UC0STE active high,
+    //           x=2 -> 4-pin SPI UC0STE active low,
+    //           x=3 -> i²c.
+    // UCSYNC = 1 -> Mode synchrone (SPI)
+    UCB0CTL0 |= ( UCMST | UCMODE_0 | UCSYNC );
+    UCB0CTL0 &= ~( UCCKPH | UCCKPL | UCMSB | UC7BIT );
+    UCB0CTL1 |= UCSSEL_2;
+
+    UCB0BR0 = 0x0A;     // divide SMCLK by 10
+    UCB0BR1 = 0x00;
+
+    // SPI : Fonctions secondaires
+    // MISO-1.6 MOSI-1.7 et CLK-1.5
+    // Ref. SLAS735G p48,49
+    P1SEL  |= ( SCK | DATA_OUT | DATA_IN);
+    P1SEL2 |= ( SCK | DATA_OUT | DATA_IN);
+
+    UCB0CTL1 &= ~UCSWRST;                                // activation USCI
+}
+
 
 void direction_control(){
     char com;
     com=UCA0RXBUF;
     switch(com){
-    case 'h':
-        UARTSendString("h----help\n\r");
-        UARTSendString("w----run\n\r");
-        UARTSendString("s----stop\n\r");
-        //UARTSendString("s----change state of LED\n\r");
-        break;
-    case '8':
-        UARTSendString("run\n\r");
-        TA1CCR1 = 1000;             //positif 0-1000
-        TA1CCR2 = 1000;             //positif 500-1000
-        break;
-    case '4':
-        UARTSendString("turn left\n\r");
-        TA1CCR1 = 0;             //positif 0-1000
-        TA1CCR2 = 750;             //positif 500-1000
-        break;
-    case '5':
-        UARTSendString("stop\n\r");
-        P2OUT &= ~BIT1;
-        TA1CCR1 = 0;             //positif 0-1000
-        TA1CCR2 = 500;             //positif 500-1000
-        break;
-    case '2':
-        UARTSendString("back\n\r");
-        P2OUT |= BIT1;
-        TA1CCR1 = 500;
-        TA1CCR2 = 250;
-        break;
-    case '6':
-        UARTSendString("turn right\n\r");
-        TA1CCR1 = 500;             //positif 0-1000
-        TA1CCR2 = 500;             //positif 500-1000
-        break;
+        case 'h':
+            UART_Send_String("h----help\n\r");
+            UART_Send_String("w----run\n\r");
+            UART_Send_String("s----stop\n\r");
+            SPI_Send_char(0x31);
+            break;
+        case '8':
+            UART_Send_String("run\n\r");
+            TA1CCR1 = 500;             //positif 0-1000
+            TA1CCR2 = 750;             //positif 500-1000
+            break;
+        case '4':
+            UART_Send_String("turn left\n\r");
+            TA1CCR1 = 0;             //positif 0-1000
+            TA1CCR2 = 750;             //positif 500-1000
+            break;
+        case '5':
+            UART_Send_String("stop\n\r");
+            P2OUT &= ~BIT1;
+            TA1CCR1 = 0;             //positif 0-1000
+            TA1CCR2 = 500;             //positif 500-1000
+            break;
+        case '2':
+            UART_Send_String("back\n\r");
+            P2OUT |= BIT1;
+            TA1CCR1 = 500;
+            TA1CCR2 = 250;
+            break;
+        case '6':
+            UART_Send_String("turn right\n\r");
+            TA1CCR1 = 500;             //positif 0-1000
+            TA1CCR2 = 500;             //positif 500-1000
+            break;
 
-    default:
-        UARTSendString("Command does not exist, use 'h' for help\n\r");
-        break;
-    }
-    __delay_cycles(1000);
+        default:
+            UART_Send_String("Command does not exist, use 'h' for help\n\r");
+            break;
+        }
+        __delay_cycles(1000);
+
 }
 
-void UARTSendString(char *pbuff)
+void UART_Send_String(char *pbuff)
 {
     while(*pbuff != '\0'){
         while(UCA0STAT & UCBUSY);
@@ -348,4 +250,12 @@ void UARTSendString(char *pbuff)
         pbuff++;
         __delay_cycles(10000);
     }
+}
+
+
+void SPI_Send_char(unsigned char data)
+{
+    while ((UCB0STAT & UCBUSY));   // attend que USCI_SPI soit dispo.
+    while(!(IFG2 & UCB0TXIFG)); // p442
+    UCB0TXBUF = data;         // Put character in transmit buffer
 }
