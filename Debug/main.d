@@ -1,17 +1,25 @@
 # FIXED
 
 main.obj: ../main.c
-main.obj: D:/Program\ Files/ti/ccsv8/ccs_base/msp430/include/msp430.h
-main.obj: D:/Program\ Files/ti/ccsv8/ccs_base/msp430/include/msp430g2553.h
-main.obj: D:/Program\ Files/ti/ccsv8/ccs_base/msp430/include/in430.h
-main.obj: D:/Program\ Files/ti/ccsv8/tools/compiler/ti-cgt-msp430_18.1.2.LTS/include/intrinsics.h
-main.obj: D:/Program\ Files/ti/ccsv8/tools/compiler/ti-cgt-msp430_18.1.2.LTS/include/intrinsics_legacy_undefs.h
+main.obj: D:/ti/ccs1020/ccs/ccs_base/msp430/include/msp430.h
+main.obj: D:/ti/ccs1020/ccs/ccs_base/msp430/include/msp430g2553.h
+main.obj: D:/ti/ccs1020/ccs/ccs_base/msp430/include/in430.h
+main.obj: D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/intrinsics.h
+main.obj: D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/intrinsics_legacy_undefs.h
 main.obj: ../ADC.h
+main.obj: D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/string.h
+main.obj: D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/_ti_config.h
+main.obj: D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/linkage.h
+main.obj: D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/sys/cdefs.h
 
 ../main.c: 
-D:/Program\ Files/ti/ccsv8/ccs_base/msp430/include/msp430.h: 
-D:/Program\ Files/ti/ccsv8/ccs_base/msp430/include/msp430g2553.h: 
-D:/Program\ Files/ti/ccsv8/ccs_base/msp430/include/in430.h: 
-D:/Program\ Files/ti/ccsv8/tools/compiler/ti-cgt-msp430_18.1.2.LTS/include/intrinsics.h: 
-D:/Program\ Files/ti/ccsv8/tools/compiler/ti-cgt-msp430_18.1.2.LTS/include/intrinsics_legacy_undefs.h: 
+D:/ti/ccs1020/ccs/ccs_base/msp430/include/msp430.h: 
+D:/ti/ccs1020/ccs/ccs_base/msp430/include/msp430g2553.h: 
+D:/ti/ccs1020/ccs/ccs_base/msp430/include/in430.h: 
+D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/intrinsics.h: 
+D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/intrinsics_legacy_undefs.h: 
 ../ADC.h: 
+D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/string.h: 
+D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/_ti_config.h: 
+D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/linkage.h: 
+D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include/sys/cdefs.h: 

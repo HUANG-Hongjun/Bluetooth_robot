@@ -4,7 +4,7 @@
 
 SHELL = cmd.exe
 
-CG_TOOL_ROOT := D:/Program Files/ti/ccsv8/tools/compiler/ti-cgt-msp430_18.1.2.LTS
+CG_TOOL_ROOT := D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS
 
 GEN_OPTS__FLAG := 
 GEN_CMDS__FLAG := 
@@ -142,14 +142,14 @@ all: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 robot.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	@echo 'Building target: "$@"'
 	@echo 'Invoking: MSP430 Linker'
-	"D:/Program Files/ti/ccsv8/tools/compiler/ti-cgt-msp430_18.1.2.LTS/bin/cl430" -vmsp --use_hw_mpy=none --advice:power=all --define=__MSP430G2553__ -g --printf_support=minimal --diag_warning=225 --diag_wrap=off --display_error_number -z -m"robot.map" --heap_size=80 --stack_size=80 -i"D:/Program Files/ti/ccsv8/ccs_base/msp430/include" -i"D:/Program Files/ti/ccsv8/tools/compiler/ti-cgt-msp430_18.1.2.LTS/lib" -i"D:/Program Files/ti/ccsv8/tools/compiler/ti-cgt-msp430_18.1.2.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="robot_linkInfo.xml" --use_hw_mpy=none --rom_model -o "robot.out" $(ORDERED_OBJS)
+	"D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/bin/cl430" -vmsp --use_hw_mpy=none --advice:power=all --define=__MSP430G2553__ -g --printf_support=minimal --diag_warning=225 --diag_wrap=off --display_error_number -z -m"robot.map" --heap_size=80 --stack_size=80 -i"D:/ti/ccs1020/ccs/ccs_base/msp430/include" -i"D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/lib" -i"D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="robot_linkInfo.xml" --use_hw_mpy=none --rom_model -o "robot.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: "$@"'
 	@echo ' '
 
 robot.hex: $(EXE_OUTPUTS)
 	@echo 'Building files: $(strip $(EXE_OUTPUTS__QUOTED))'
 	@echo 'Invoking: MSP430 Hex Utility'
-	"D:/Program Files/ti/ccsv8/tools/compiler/ti-cgt-msp430_18.1.2.LTS/bin/hex430" --memwidth=8 --romwidth=8 -o "robot.hex" $(EXE_OUTPUTS__QUOTED)
+	"D:/ti/ccs1020/ccs/tools/compiler/ti-cgt-msp430_20.2.2.LTS/bin/hex430" --memwidth=8 --romwidth=8 --diag_wrap=off -o "robot.hex" $(EXE_OUTPUTS__QUOTED)
 	@echo 'Finished building: $(strip $(EXE_OUTPUTS__QUOTED))'
 	@echo ' '
 
