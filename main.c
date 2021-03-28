@@ -5,22 +5,23 @@
 //Cablage des captures
 #define capIR BIT4                             //Capteur infrarouge P1.4
 
-//SPI master clock data in/out
-#define SCK         BIT5            // Serial Clock
-#define DATA_OUT    BIT6            // DATA out
-#define DATA_IN     BIT7            // DATA in
+//obstacle 0 = false 1= true
+int IsObstacleInfront = 0;
+int IsObstacleLeft = 0;
+int IsObstacleRight = 0;
 
-//Les valeurs preconception
-#define vmaxG 1000                              //vitesse de roue gauche (0-1000)
-#define vmaxD 1000                              //vitesse de roue droite (500-1000)
+//position camare
+int PositionCamera =2; // 1=left 2=middle 3=right
+
 
 //Fonnction pour initialiser
 void init_Infrarouge(void);
 void init_Moteur(void);
 void init_UART(void);
-void direction_control(void);
+void command_reaction(void);
 void UART_Send_String(char *pbuff);
 void init_SPI(void);
+void robot_stop(void);
 
 
 
@@ -33,15 +34,10 @@ int main(void)
     DCOCTL = CALDCO_1MHZ;
 
 	ADC_init();
-
 	init_Moteur();
-
 	init_Infrarouge();
-
 	init_UART();
-
 	init_SPI();
-
 
 	__delay_cycles(100000);
 	__enable_interrupt();
@@ -68,28 +64,68 @@ __interrupt void USCI0RX_ISR(void)
    //while (!(IFG2&UCA0TXIFG));
    IFG2&=~UCA0RXIFG;                // USCI_A0 TX buffer ready?
    //UCA0TXBUF = UCA0RXBUF;
-   direction_control();
+   command_reaction();
 }
 
 
 #pragma vector = TIMER0_A1_VECTOR
 __interrupt void stop(void) {
-    //stop
     P1DIR &= ~capIR;
     ADC_Demarrer_conversion(4);         //P1.4
     int res;
     res = ADC_Lire_resultat();
-    int v1, v2;
-    v1 = TA1CCR1;
-    v2 = TA1CCR2;
-    while (res > 500){
-        TA1CCR1 = 0;
-        TA1CCR2 = 500;
-        ADC_Demarrer_conversion(4);
-        res = ADC_Lire_resultat();
+
+    /*test if obstacle*/
+    if (res > 500){
+        /*obstacle infront*/
+        if (PositionCamera == 2){
+            robot_stop();
+            if (IsObstacleInfront == 0){
+                IsObstacleInfront = 1;
+                UART_Send_String("Obstacle infront\n\r");
+            }
+        }
+        /*obstavle left*/
+        else if (PositionCamera == 1){
+            robot_stop();
+            if (IsObstacleLeft == 0){
+                IsObstacleLeft = 1;
+                UART_Send_String("Obstacle Left\n\r");
+            }
+        }
+        /*obstacle right*/
+        else{
+            robot_stop();
+            if (IsObstacleRight == 0){
+                IsObstacleRight = 1;
+                UART_Send_String("Obstacle Right\n\r");
+            }
+        }
     }
-    TA1CCR1 = v1;
-    TA1CCR2 = v2;
+    /*no obstalce*/
+    else{
+        /*infront*/
+        if (PositionCamera == 2){
+            if(IsObstacleInfront == 1){
+                IsObstacleInfront = 0;
+                UART_Send_String("No obstacle Infront\n\r");
+            }
+        }
+        /*left*/
+        else if (PositionCamera == 1){
+            if(IsObstacleLeft == 1){
+                IsObstacleLeft = 0;
+                UART_Send_String("No obstacle Left\n\r");
+            }
+        }
+        /*right*/
+        else{
+            if(IsObstacleRight == 1){
+                IsObstacleRight = 0;
+                UART_Send_String("No obstacle Right\n\r");
+            }
+        }
+    }
 
     TA0CTL &= ~TAIFG;
 }
@@ -125,7 +161,7 @@ void init_Moteur(void)
 }
 
 
-
+//initialisation bluetooth
 void init_UART(void){
 
       //GPIO
@@ -143,6 +179,7 @@ void init_UART(void){
       //_bis_SR_register(LPM0_bits);
  }
 
+//initialisation SPI
 void init_SPI( void )
 {
     UCB0CTL1 |= UCSWRST;
@@ -159,9 +196,19 @@ void init_SPI( void )
 }
 
 
-void direction_control(){
+void command_reaction(){
     char com;
     com=UCA0RXBUF;
+    /*switch command
+     * h == help
+     * 8 == run
+     * 5 == stop
+     * 2 == back
+     * 4 == turn left
+     * 6 == turn right
+     * q == camera turn left
+     * e == camera turn right
+     * w == camera reposition*/
     switch(com){
         case 'h':
             UART_Send_String("h----help\n\r");
@@ -175,20 +222,31 @@ void direction_control(){
             UART_Send_String("w----camera reposition\n\r");
             break;
         case '8':
-            UART_Send_String("run\n\r");
-            TA1CCR1 = 500;             //positif 0-1000
-            TA1CCR2 = 750;             //positif 500-1000
+            if(IsObstacleInfront == 0){
+                UART_Send_String("run\n\r");
+                TA1CCR1 = 500;             //positif 0-1000
+                TA1CCR2 = 750;             //positif 500-1000
+            }
+            else{
+                UART_Send_String("Obstacle Infront\n\r");
+                robot_stop();
+            }
             break;
         case '4':
-            UART_Send_String("turn left\n\r");
-            TA1CCR1 = 0;             //positif 0-1000
-            TA1CCR2 = 750;             //positif 500-1000
+            if(IsObstacleLeft == 0){
+                UART_Send_String("turn left\n\r");
+                TA1CCR1 = 0;             //positif 0-1000
+                TA1CCR2 = 750;             //positif 500-1000
+            }
+            else{
+                UART_Send_String("Obstacle Left\n\r");
+                robot_stop();
+            }
             break;
         case '5':
             UART_Send_String("stop\n\r");
             P2OUT &= ~BIT1;
-            TA1CCR1 = 0;             //positif 0-1000
-            TA1CCR2 = 500;             //positif 500-1000
+            robot_stop();
             break;
         case '2':
             UART_Send_String("back\n\r");
@@ -197,20 +255,29 @@ void direction_control(){
             TA1CCR2 = 250;
             break;
         case '6':
-            UART_Send_String("turn right\n\r");
-            TA1CCR1 = 500;             //positif 0-1000
-            TA1CCR2 = 500;             //positif 500-1000
+            if(IsObstacleRight == 0){
+                UART_Send_String("turn right\n\r");
+                TA1CCR1 = 500;             //positif 0-1000
+                TA1CCR2 = 500;             //positif 500-1000
+            }
+            else{
+                UART_Send_String("Obstacle Right\n\r");
+                robot_stop();
+            }
             break;
         case'q':
             UART_Send_String("camera turn left\n\r");
+            PositionCamera = 1;
             UCB0TXBUF = 0x31;
             break;
         case'e':
             UART_Send_String("camera turn right\n\r");
+            PositionCamera = 3;
             UCB0TXBUF = 0x32;
             break;
         case'w':
             UART_Send_String("camera reposition\n\r");
+            PositionCamera = 2;
             UCB0TXBUF = 0x33;
             break;
         default:
@@ -227,8 +294,12 @@ void UART_Send_String(char *pbuff)
         while(UCA0STAT & UCBUSY);
         UCA0TXBUF = *pbuff;
         pbuff++;
-        __delay_cycles(10000);
     }
+}
+
+void robot_stop(){
+    TA1CCR1 = 0;
+    TA1CCR2 = 500;
 }
 
 
