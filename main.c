@@ -2,19 +2,20 @@
 #include "ADC.h"
 #include <string.h>
 
-//Cablage des captures
-#define capIR BIT4                             //Capteur infrarouge P1.4
+/*Cablage des captures*/
+#define capIR BIT4                             /*Capteur infrarouge P1.4*/
 
-//obstacle 0 = false 1= true
+/*obstacle 0 = false 1= true*/
 int IsObstacleInfront = 0;
 int IsObstacleLeft = 0;
 int IsObstacleRight = 0;
 
-//position camare
-int PositionCamera =2; // 1=left 2=middle 3=right
+/*position camare
+ *1=left 2=middle 3=right*/
+int PositionCamera =2; 
 
 
-//Fonnction pour initialiser
+/*Fonnction pour initialiser*/
 void init_Infrarouge(void);
 void init_Moteur(void);
 void init_UART(void);
@@ -27,11 +28,12 @@ void robot_stop(void);
 
 int main(void)
 {
-	WDTCTL = WDTPW | WDTHOLD;	             // stop watchdog timer
-    //CLOCK
-    DCOCTL = 0;
-    BCSCTL1 = CALBC1_1MHZ;
-    DCOCTL = CALDCO_1MHZ;
+	/* stop watchdog timer*/
+	WDTCTL = WDTPW | WDTHOLD;	             
+	/*CLOCK*/
+	DCOCTL = 0;
+	BCSCTL1 = CALBC1_1MHZ;
+	DCOCTL = CALDCO_1MHZ;
 
 	ADC_init();
 	init_Moteur();
@@ -41,38 +43,39 @@ int main(void)
 
 	__delay_cycles(100000);
 	__enable_interrupt();
-	while(1);
+	while(1){};
 }
 
 
-//====================================interrupt============================================
+/*====================================interrupt============================================*/
 
-//TX interrupt
+/*TX interrupt*/
 #pragma vector=USCIAB0TX_VECTOR
 __interrupt void USCI0TX_ISR(void)
 {
-    //while(!(IFG2 & UCA0TXIFG));
-    IFG2&=~UCA0TXIFG;
+	//while(!(IFG2 & UCA0TXIFG));
+	IFG2&=~UCA0TXIFG;
 }
 
 
 
-//RX interrupt
+/*RX interrupt*/
 #pragma vector=USCIAB0RX_VECTOR
 __interrupt void USCI0RX_ISR(void)
 {
-   //while (!(IFG2&UCA0TXIFG));
-   IFG2&=~UCA0RXIFG;                // USCI_A0 TX buffer ready?
-   //UCA0TXBUF = UCA0RXBUF;
-   command_reaction();
+   	//while (!(IFG2&UCA0TXIFG));
+	/* USCI_A0 TX buffer ready? */
+   	IFG2&=~UCA0RXIFG;                
+   	//UCA0TXBUF = UCA0RXBUF;
+   	command_reaction();
 }
 
 
 #pragma vector = TIMER0_A1_VECTOR
 __interrupt void stop(void) {
     P1DIR &= ~capIR;
-    ADC_Demarrer_conversion(4);         //P1.4
-    int res;
+    ADC_Demarrer_conversion(4);         
+    SINT_32 res;
     res = ADC_Lire_resultat();
 
     /*test if obstacle*/
@@ -131,55 +134,72 @@ __interrupt void stop(void) {
 }
 
 
-//initialisation d'infrarouge
+/*initialisation d'infrarouge*/
 void init_Infrarouge(void)
 {
-    TA0CTL = 0 | (TASSEL_2 | ID_3 | MC_1 | TAIE);       //source SMCLK, prediviseur 8, mode up, enable interrupteur
-    TA0CCR0 = 12500;                                    //100ms
-    TA0CTL &= ~TAIFG;                                   //flag=0
+	/*source SMCLK, prediviseur 8, mode up, enable interrupteur*/
+    	TA0CTL = 0 | (TASSEL_2 | ID_3 | MC_1 | TAIE);
+	/*100ms*/       
+    	TA0CCR0 = 12500;
+	/*flag=0*/                                    
+    	TA0CTL &= ~TAIFG;                                   
 }
 
-//initialisation de moteur
+/*initialisation de moteur*/
 void init_Moteur(void)
 {
-    P2SEL &= ~(BIT1|BIT4);                   //p2.1 p2.4 mode selectionner E/S    P2SEL2 &= ~(BIT1|BIT4);
-
-    P2SEL |= BIT2|BIT5;                      //p2.2 p2.5 timer PWM
-    P2SEL2 &= ~(BIT2|BIT5);
-    P2DIR |= BIT1|BIT2|BIT4|BIT5;            //p2.1 p2.2 p2.4 p2.5 Output
-
-    P2OUT &= ~BIT1;                          //roue gauche avancer
-    P2OUT |= BIT4;                           //roue droite avancer
-
-    TA1CTL = 0x0210;                         //mode up, source SMCLK
-    TA1CCR0 = 1000;
-
-    TA1CCTL1 = 0x00E0;                       //mode 7 Reset/Set
-    TA1CCTL2 = 0x00E0;                       //mode 7 Reset/Set
-    TA1CCR1 = 0;                             //roue gauche arreter
-    TA1CCR2 = 500;                           //roue droite arreter
+	/*p2.1 p2.4 mode selectionner E/S    */
+    	P2SEL &= ~(BIT1|BIT4);                   
+	P2SEL2 &= ~(BIT1|BIT4);
+	
+	/*p2.2 p2.5 timer PWM*/
+    	P2SEL |= BIT2|BIT5;                      
+    	P2SEL2 &= ~(BIT2|BIT5);
+	/*p2.1 p2.2 p2.4 p2.5 Output*/
+    	P2DIR |= BIT1|BIT2|BIT4|BIT5;            
+	
+	/*roue gauche avancer*/
+    	P2OUT &= ~BIT1;
+	/*roue droite avancer*/                          
+    	P2OUT |= BIT4;                           
+	
+	/*mode up, source SMCLK*/
+    	TA1CTL = 0x0210;                         
+    	TA1CCR0 = 1000;
+	/*mode 7 Reset/Set*/
+    	TA1CCTL1 = 0x00E0;                       
+    	TA1CCTL2 = 0x00E0; 
+      /*robot stop*/               
+    	TA1CCR1 = 0;                             
+    	TA1CCR2 = 500;                  
 }
 
 
-//initialisation bluetooth
+/*initialisation bluetooth*/
 void init_UART(void){
 
-      //GPIO
-      P1SEL = BIT1 + BIT2 ;                     // P1.1 = RXD, P1.2=TXD
-      P1SEL2 = BIT1 + BIT2 ;                    // P1.1 = RXD, P1.2=TXD
+      /*GPIO
+	 *P1.1 = RXD, P1.2=TXD*/
+      P1SEL = BIT1 + BIT2 ;                     
+      P1SEL2 = BIT1 + BIT2 ;                    
 
-      UCA0CTL1 |= UCSSEL_2;                     // SMCLK
-      UCA0BR0 = 104;                            // 1MHz 9600
-      UCA0BR1 = 0;                              // 1MHz 9600
-      UCA0MCTL =UCBRS_0;                        // Modulation UCBRSx = 1
-      UCA0CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
+	/* SMCLK*/
+      UCA0CTL1 |= UCSSEL_2;
+	/* 1MHz 9600*/                     
+      UCA0BR0 = 104;                            
+      UCA0BR1 = 0;
+	/* Modulation UCBRSx = 1*/                              
+      UCA0MCTL =UCBRS_0;
+	/*Initialize USCI state machine*/                        
+      UCA0CTL1 &= ~UCSWRST;                     
 
-      IE2 |= UCA0RXIE+UCA0TXIE;                 //enable interrupt
+	/*enable interrupt*/
+      IE2 |= UCA0RXIE+UCA0TXIE;                 
       _enable_interrupts();
       //_bis_SR_register(LPM0_bits);
  }
 
-//initialisation SPI
+/*initialisation SPI*/
 void init_SPI( void )
 {
     UCB0CTL1 |= UCSWRST;
@@ -196,7 +216,7 @@ void init_SPI( void )
 }
 
 
-void command_reaction(){
+void command_reaction(void){
     char com;
     com=UCA0RXBUF;
     /*switch command
@@ -223,24 +243,26 @@ void command_reaction(){
             break;
         case '8':
             if(IsObstacleInfront == 0){
-                UART_Send_String("run\n\r");
-                TA1CCR1 = 500;             //positif 0-1000
-                TA1CCR2 = 750;             //positif 500-1000
+               	UART_Send_String("run\n\r");
+		    	/*positif 0-1000*/
+                	TA1CCR1 = 500;
+			/*positif 500-1000*/             
+                	TA1CCR2 = 750;             
             }
             else{
-                UART_Send_String("Obstacle Infront\n\r");
-                robot_stop();
+                	UART_Send_String("Obstacle Infront\n\r");
+                	robot_stop();
             }
             break;
         case '4':
             if(IsObstacleLeft == 0){
-                UART_Send_String("turn left\n\r");
-                TA1CCR1 = 0;             //positif 0-1000
-                TA1CCR2 = 750;             //positif 500-1000
+                	UART_Send_String("turn left\n\r");
+                	TA1CCR1 = 0;             
+                	TA1CCR2 = 750;             
             }
             else{
-                UART_Send_String("Obstacle Left\n\r");
-                robot_stop();
+                	UART_Send_String("Obstacle Left\n\r");
+                	robot_stop();
             }
             break;
         case '5':
@@ -257,8 +279,8 @@ void command_reaction(){
         case '6':
             if(IsObstacleRight == 0){
                 UART_Send_String("turn right\n\r");
-                TA1CCR1 = 500;             //positif 0-1000
-                TA1CCR2 = 500;             //positif 500-1000
+                TA1CCR1 = 500;             
+                TA1CCR2 = 500;             
             }
             else{
                 UART_Send_String("Obstacle Right\n\r");
@@ -291,13 +313,13 @@ void command_reaction(){
 void UART_Send_String(char *pbuff)
 {
     while(*pbuff != '\0'){
-        while(UCA0STAT & UCBUSY);
+        while(UCA0STAT & UCBUSY){};
         UCA0TXBUF = *pbuff;
         pbuff++;
     }
 }
 
-void robot_stop(){
+void robot_stop(void){
     TA1CCR1 = 0;
     TA1CCR2 = 500;
 }
